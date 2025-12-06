@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Buy Me A Coffee - Web3 Edition</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
+
+  <style>
+    /* --- DESIGN TOKENS --- */
+    :root {
+      --c-red: #ff4d4d;
+      --c-yellow: #ffcf25;
+      --c-blue: #3a86ff;
+      --c-black: #1a1a1a;
+      --c-white: #fcfbf7;
+      --c-gray: #e0e0e0;
+      
+      --border-thick: 3px solid var(--c-black);
+      --border-thin: 1px solid var(--c-black);
+      
+      --shadow-hard: 6px 6px 0px var(--c-black);
+      --shadow-soft: 4px 4px 0px var(--c-black);
+      --shadow-pressed: 2px 2px 0px var(--c-black);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Courier New', Courier, monospace; /* Retro-tech feel */
+      background-color: var(--c-yellow);
+      background-image: radial-gradient(var(--c-black) 1px, transparent 1px);
+      background-size: 20px 20px;
+      color: var(--c-black);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    /* --- LAYOUT GRID --- */
+    .wrapper {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      width: 100%;
+      max-width: 1200px;
+      background: var(--c-white);
+      border: var(--border-thick);
+      box-shadow: var(--shadow-hard);
+      min-height: 85vh;
+    }
+
+    /* --- SIDEBAR --- */
+    .sidebar {
+      background: var(--c-white);
+      border-right: var(--border-thick);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand {
+      background: var(--c-black);
+      color: var(--c-white);
+      padding: 2rem;
+      border-bottom: var(--border-thick);
+    }
+    .brand h1 {
+      font-size: 2rem;
+      line-height: 1;
+      text-transform: uppercase;
+      font-weight: 900;
+      letter-spacing: -1px;
+    }
+    .brand span { color: var(--c-yellow); font-size: 0.6em; display: block; margin-top: 5px; letter-spacing: 2px;}
+
+    .create-section {
+      padding: 1.5rem;
+      border-bottom: var(--border-thick);
+      background: #f4f4f4;
+    }
+    .btn-create {
+      display: block;
+      width: 100%;
+      padding: 15px;
+      background: var(--c-blue);
+      color: white;
+      text-align: center;
+      text-decoration: none;
+      font-weight: bold;
+      text-transform: uppercase;
+      border: var(--border-thick);
+      box-shadow: var(--shadow-soft);
+      transition: all 0.1s;
+    }
+    .btn-create:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0px var(--c-black); }
+    .btn-create:active { transform: translate(2px, 2px); box-shadow: var(--shadow-pressed); }
+
+    .list-container {
+      flex-grow: 1;
+      overflow-y: auto;
+      max-height: 60vh;
+    }
+    .list-label {
+      padding: 10px 20px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      border-bottom: var(--border-thick);
+      background: var(--c-yellow);
+    }
+    .creator-item {
+      padding: 15px 20px;
+      border-bottom: var(--border-thin);
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .creator-item:hover { background: #fffbe6; }
+    .creator-item.active { background: var(--c-black); color: var(--c-yellow); }
+    
+    /* Shape Avatar for List */
+    .shape-icon {
+      min-width: 25px; height: 25px;
+      background: var(--c-red);
+      border: 2px solid currentColor;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: white;
+      font-weight: bold;
+    }
+    .shape-icon.circle { border-radius: 50%; background: var(--c-blue); }
+    .shape-icon.triangle { 
+        width: 0; height: 0; background: transparent; 
+        border-left: 10px solid transparent; border-right: 10px solid transparent; 
+        border-bottom: 20px solid var(--c-yellow); border-top: 0;
+        margin-right: 5px;
+    }
+
+    /* --- MAIN PANEL --- */
+    .main-panel {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Top Navigation Bar */
+    .top-nav {
+      padding: 1.5rem 2rem;
+      border-bottom: var(--border-thick);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+    }
+    .btn-connect {
+      padding: 10px 20px;
+      background: var(--c-red);
+      color: white;
+      border: var(--border-thick);
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: var(--shadow-soft);
+      transition: 0.1s;
+    }
+    .btn-connect:active { transform: translate(2px, 2px); box-shadow: 0 0 0; }
+
+    /* Content Area */
+    .content-area {
+      padding: 3rem;
+      overflow-y: auto;
+      height: 100%;
+      background-color: #fafafa;
+    }
+
+    /* Empty State Graphic */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #999;
+      opacity: 0.5;
+    }
+    .geo-art {
+      width: 100px; height: 100px;
+      background: var(--c-red);
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .geo-art::after {
+      content: ''; position: absolute; top: 20px; left: 20px;
+      width: 100px; height: 100px;
+      border: 3px solid var(--c-blue);
+      border-radius: 50%;
+    }
+
+    /* Profile Header */
+    .profile-header {
+      margin-bottom: 3rem;
+    }
+    .profile-name {
+      font-size: 3.5rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      line-height: 1;
+      text-shadow: 4px 4px 0px var(--c-gray);
+      word-break: break-word;
+    }
+    .profile-addr {
+      font-family: monospace;
+      background: var(--c-black);
+      color: var(--c-white);
+      padding: 2px 8px;
+      font-size: 0.9rem;
+      display: inline-block;
+      margin-top: 10px;
+    }
+
+    /* Action Grid */
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+
+    /* Ticket Card (Form) */
+    .ticket-card {
+      background: var(--c-white);
+      border: var(--border-thick);
+      box-shadow: var(--shadow-hard);
+      padding: 2rem;
+      position: relative;
+    }
+    /* "Hole punch" effect for ticket look */
+    .ticket-card::before {
+      content: ''; position: absolute; left: -10px; top: 50%;
+      width: 20px; height: 20px; background: #fafafa;
+      border-radius: 50%; border-right: var(--border-thick);
+    }
+    .ticket-card::after {
+      content: ''; position: absolute; right: -10px; top: 50%;
+      width: 20px; height: 20px; background: #fafafa;
+      border-radius: 50%; border-left: var(--border-thick);
+    }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 0.8rem; text-transform: uppercase;}
+    .input-field {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--c-black);
+      background: #f0f0f0;
+      font-family: inherit;
+      font-size: 1rem;
+    }
+    .input-field:focus { outline: none; background: #fff; border-color: var(--c-blue); }
+    
+    .btn-buy {
+      width: 100%;
+      padding: 15px;
+      background: var(--c-black);
+      color: var(--c-white);
+      font-size: 1.2rem;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: 0.2s;
+    }
+    .btn-buy:hover { background: var(--c-blue); }
+    .btn-buy:disabled { background: #aaa; cursor: not-allowed; }
+
+    /* Supporters Grid (Masonry look) */
+    .supporters-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .memo-card {
+      background: white;
+      border: 2px solid var(--c-black);
+      padding: 15px;
+      position: relative;
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.1);
+    }
+    .memo-shape {
+      position: absolute; top: -5px; right: -5px;
+      width: 15px; height: 15px; background: var(--c-yellow);
+      border: 1px solid black;
+    }
+    .memo-name { font-weight: 900; font-size: 0.9rem; margin-bottom: 5px; display: block; }
+    .memo-msg { font-size: 0.9rem; line-height: 1.4; color: #555; font-style: italic;}
+
+    /* Toast Notification */
+    #toast {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background: var(--c-black);
+      color: white;
+      padding: 15px 25px;
+      border-left: 10px solid var(--c-yellow);
+      box-shadow: var(--shadow-hard);
+      transform: translateY(150%);
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 1000;
+      font-weight: bold;
+    }
+    #toast.show { transform: translateY(0); }
+
+    /* Loader */
+    .geo-loader {
+      width: 30px; height: 30px;
+      background: var(--c-red);
+      animation: tumble 1s infinite;
+      margin: 20px auto;
+    }
+    @keyframes tumble { 0% {transform: rotate(0deg);} 50% {transform: rotate(180deg) scale(0.8);} 100% {transform: rotate(360deg);} }
+
+    /* Responsiveness */
+    @media (max-width: 900px) {
+      .wrapper { grid-template-columns: 1fr; display: block; }
+      .sidebar { height: auto; border-right: none; border-bottom: var(--border-thick); }
+      .list-container { max-height: 200px; }
+      .action-grid { grid-template-columns: 1fr; }
+      .profile-name { font-size: 2.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+  
+  <aside class="sidebar">
+    <div class="brand">
+      <h1>Buy Me<br>A Coffee</h1>
+      <span>WEB3 EDITION</span>
+    </div>
+    
+    <div class="create-section">
+      <a href="deployer.html" class="btn-create">Start Project +</a>
+    </div>
+
+    <div class="list-label">Directory</div>
+    <div id="creatorsList" class="list-container">
+      <div class="geo-loader"></div>
+    </div>
+  </aside>
+
+  <main class="main-panel">
+    <div class="top-nav">
+      <div id="statusIndicator" style="font-weight:bold; font-size:0.8rem; color:#888;">READY</div>
+      <button id="connectButton" class="btn-connect">CONNECT WALLET</button>
+    </div>
+
+    <div class="content-area">
+      
+      <div id="emptyState" class="empty-state">
+        <div class="geo-art"></div>
+        <h2>Select a Creator</h2>
+        <p>Choose a project from the left to support them.</p>
+      </div>
+
+      <div id="loadedContent" class="hidden" style="display: none;">
+        <div class="profile-header">
+          <div id="artistNameDisplay" class="profile-name">Artist Name</div>
+          <div id="artistAddressDisplay" class="profile-addr">0x000...000</div>
+        </div>
+
+        <div class="action-grid">
+          
+          <div>
+            <div class="ticket-card">
+              <h3 style="margin-bottom:20px; text-transform:uppercase; border-bottom:2px solid black; padding-bottom:10px;">Buy a Coffee</h3>
+              
+              <div class="form-group">
+                <label class="form-label">Your Name</label>
+                <input id="nameInput" class="input-field" placeholder="e.g. Satoshi">
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Message</label>
+                <textarea id="messageInput" class="input-field" rows="3" placeholder="Great work!"></textarea>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Amount (ETH)</label>
+                <input id="amountInput" type="number" step="0.001" value="0.001" class="input-field">
+              </div>
+
+              <button id="buyButton" class="btn-buy">SEND ☕</button>
+            </div>
+          </div>
+
+          <div>
+            <h3 style="margin-bottom:20px; text-transform:uppercase;">Recent Notes</h3>
+            <div id="memosList" class="supporters-grid">
+              </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+<div id="toast">Transaction Sent!</div>
+
+<script>
+  // --- CONFIGURATION ---
+  const FACTORY_ADDRESS = "0xE992790cCe6cA04dc5CeD8E2E69C5a26B92d4a13"; 
+  const FACTORY_ABI = ["function getAllContracts() external view returns (address[] memory)"];
+  
+  // NOTE: I added both "name()" and "artistName()" to be safe
+  const COFFEE_ABI = [
+    "function buyCoffee(string name, string message) payable",
+    "function getAllCoffees() view returns (tuple(string name, string message)[])",
+    "function artistName() view returns (string)",
+    "function name() view returns (string)" 
+  ];
+
+  // --- VARIABLES ---
+  let provider, signer, factoryContract, currentCoffeeContract;
+
+  // --- UI REFS ---
+  const els = {
+    connectBtn: document.getElementById("connectButton"),
+    creatorsList: document.getElementById("creatorsList"),
+    emptyState: document.getElementById("emptyState"),
+    loadedContent: document.getElementById("loadedContent"),
+    artistName: document.getElementById("artistNameDisplay"),
+    artistAddr: document.getElementById("artistAddressDisplay"),
+    memosList: document.getElementById("memosList"),
+    buyBtn: document.getElementById("buyButton"),
+    toast: document.getElementById("toast")
+  };
+
+  // --- UTILS ---
+  function showToast(msg, type='success') {
+    els.toast.innerText = msg;
+    els.toast.style.borderLeftColor = type === 'error' ? 'var(--c-red)' : 'var(--c-yellow)';
+    els.toast.classList.add('show');
+    setTimeout(() => els.toast.classList.remove('show'), 4000);
+  }
+
+  // --- LOGIC ---
+
+  async function init() {
+    if (typeof window.ethereum !== 'undefined') {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length > 0) connectWallet();
+        else els.creatorsList.innerHTML = '<div style="padding:20px; text-align:center; font-size:0.8rem;">Connect wallet to load directory.</div>';
+    } else {
+        els.creatorsList.innerHTML = '<div style="padding:20px; text-align:center;">MetaMask Required</div>';
+    }
+  }
+
+  async function connectWallet() {
+    try {
+        provider = new ethers.BrowserProvider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+        
+        const addr = await signer.getAddress();
+        els.connectBtn.innerText = addr.slice(0,6) + "..." + addr.slice(-4);
+        els.connectBtn.style.background = "var(--c-black)";
+        
+        loadCreators();
+    } catch (e) {
+        console.error(e);
+        showToast("Connection failed", "error");
+    }
+  }
+
+  async function loadCreators() {
+    try {
+        factoryContract = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, signer);
+        const addresses = await factoryContract.getAllContracts();
+
+        els.creatorsList.innerHTML = ""; 
+
+        if (addresses.length === 0) {
+            els.creatorsList.innerHTML = '<div style="padding:20px; opacity:0.6;">No projects yet.</div>';
+            return;
+        }
+
+        const reversed = [...addresses].reverse();
+
+        // Loop through and create items
+        // We will initially show "Loading..." then fetch names asynchronously
+        reversed.forEach((addr, index) => {
+            const item = document.createElement('div');
+            item.className = 'creator-item';
+            const shapeClass = index % 2 === 0 ? 'circle' : 'square';
+            
+            // Unique ID for the title so we can update it later
+            const titleId = `title-${addr}`;
+            
+            item.innerHTML = `
+                <div class="shape-icon ${shapeClass}"></div>
+                <div style="width:100%">
+                    <div id="${titleId}" style="font-weight:900; font-size:0.9rem;">Loading...</div>
+                    <div style="font-family:monospace; font-size:0.7rem; opacity:0.6;">${addr.slice(0,8)}...</div>
+                </div>
+            `;
+            
+            item.onclick = () => selectCreator(addr, item);
+            els.creatorsList.appendChild(item);
+
+            // Fetch name asynchronously
+            fetchContractName(addr, titleId);
+        });
+
+    } catch (e) {
+        console.error(e);
+        els.creatorsList.innerHTML = '<div style="padding:20px; color:red;">Failed to load list.</div>';
+    }
+  }
+
+  // Helper to fetch individual name
+  async function fetchContractName(address, elementId) {
+      try {
+          // We use a read-only provider for speed if possible, or existing signer
+          const contract = new ethers.Contract(address, COFFEE_ABI, signer);
+          
+          let name = "Unnamed Project";
+          try {
+             // Try standard getter 'artistName'
+             name = await contract.artistName();
+          } catch(e) {
+             try {
+                // Fallback to 'name'
+                name = await contract.name();
+             } catch(e2) {
+                 name = "Project " + address.slice(0,4);
+             }
+          }
+          
+          const el = document.getElementById(elementId);
+          if(el) el.innerText = name;
+          
+      } catch(e) {
+          console.log("Could not fetch name for " + address);
+      }
+  }
+
+  async function selectCreator(address, domItem) {
+    document.querySelectorAll('.creator-item').forEach(el => el.classList.remove('active'));
+    domItem.classList.add('active');
+
+    els.emptyState.style.display = 'none';
+    els.loadedContent.style.display = 'block';
+    
+    // Get the name from the sidebar logic (it might already be loaded there)
+    const sidebarTitle = domItem.querySelector('div[id^="title-"]').innerText;
+    els.artistName.innerText = sidebarTitle === "Loading..." ? "Fetching..." : sidebarTitle;
+    
+    els.artistAddr.innerText = address;
+    els.memosList.innerHTML = '<div class="geo-loader"></div>';
+
+    currentCoffeeContract = new ethers.Contract(address, COFFEE_ABI, signer);
+    loadMemos();
+  }
+
+  async function loadMemos() {
+    try {
+        const memos = await currentCoffeeContract.getAllCoffees();
+        els.memosList.innerHTML = "";
+
+        if (memos.length === 0) {
+            els.memosList.innerHTML = '<div style="font-style:italic; opacity:0.6;">No supporters yet. Be the first!</div>';
+            return;
+        }
+
+        [...memos].reverse().forEach(memo => {
+            const safeName = memo.name.replace(/</g, "&lt;");
+            const safeMsg = memo.message.replace(/</g, "&lt;");
+            
+            const card = document.createElement('div');
+            card.className = 'memo-card';
+            card.innerHTML = `
+                <div class="memo-shape" style="background: ${Math.random() > 0.5 ? 'var(--c-red)' : 'var(--c-blue)'}"></div>
+                <span class="memo-name">${safeName}</span>
+                <span class="memo-msg">${safeMsg}</span>
+            `;
+            els.memosList.appendChild(card);
+        });
+    } catch (e) {
+        els.memosList.innerHTML = "Error loading data.";
+    }
+  }
+
+  els.buyBtn.addEventListener('click', async () => {
+    if(!currentCoffeeContract) return;
+    
+    const name = document.getElementById("nameInput").value || "Anon";
+    const msg = document.getElementById("messageInput").value || "Coffee!";
+    const val = document.getElementById("amountInput").value;
+
+    try {
+        showToast("Requesting Signature...");
+        els.buyBtn.disabled = true;
+        els.buyBtn.innerText = "WAITING...";
+
+        const tx = await currentCoffeeContract.buyCoffee(name, msg, {
+            value: ethers.parseEther(val)
+        });
+
+        showToast("Transaction Sent! Waiting for block...", "success");
+        await tx.wait();
+
+        showToast("Success! Coffee Purchased.", "success");
+        document.getElementById("messageInput").value = "";
+        loadMemos();
+    } catch (e) {
+        console.error(e);
+        showToast("Transaction Failed", "error");
+    } finally {
+        els.buyBtn.disabled = false;
+        els.buyBtn.innerText = "SEND ☕";
+    }
+  });
+
+  els.connectBtn.addEventListener('click', connectWallet);
+  init();
+
+</script>
+</body>
+</html>
